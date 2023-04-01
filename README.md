@@ -1,7 +1,6 @@
-# GenshinLeRF
+# **Title:** GenshinLeRF
 
-## Pierre Le, Rahul Shah, Jason Yang, Levy Deng
-
+## **Team members:** Pierre Le, Rahul Shah, Jason Yang, Levy Deng
 
 
 # Problem Description
@@ -26,7 +25,7 @@ To resolve the difficulty of attaching NeRF onto our shaders, as a proof of conc
 
 # Goals and Deliverables
 - What we're trying to accomplish:
-  - We are 
+  - We are attempting to implement shaders in a video game alongside using LeRF to .
 - What results we're going for:
     - 
 - Why we think we can accomplish these goals:
