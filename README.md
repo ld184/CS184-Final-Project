@@ -25,20 +25,38 @@ To resolve the difficulty of attaching NeRF onto our shaders, as a proof of conc
 
 # Goals and Deliverables
 - What we're trying to accomplish:
-  - We are attempting to implement shaders in a video game alongside using LeRF to .
+  - We are attempting to implement shaders in a video game alongside potentially using LeRF / NeRF on video game scenes. 
 - What results we're going for:
-    - 
+    - Embedding shaders with LeRF to interact with game engine using injections/mods
 - Why we think we can accomplish these goals:
-    - 
+    - NeRF code is open source and we should have computing resources for training any neural network models
     - There is existing documentation and tutorials on how to inject shaders 
 - Answering questions mentioned: - Since this is a graphics class you will likely define the kind of images you will create (e.g. including a photo of a new lighting effect you will simulate).
+    - The image should be a character posing in a scene with shaders in the background or a game scene.
+<table>
+  <tr>
+    <td> <img src="images/1.png" ></td>
+    <td><img src="images/2.png" > </td>
+   </tr> 
+   <tr>
+      <td><img src="images/3.png"></td>
+      <td><img src="images/4.png">
+  </td>
+  </tr>
+</table>
+
 - If you are working on an interactive system, describe what demo you will create.
+    - If we are able to implement LeRF, we should have text input to query any objects in a scene.
 - Define how you will measure the quality / performance of your system (e.g. graphs showing speedup, or quantifying accuracy).
+    - We measure by the quality of the shaders on the environment as well as the accuracy of LeRF of game objects
 - What questions do you plan to answer with your analysis?
+    - We hope to implement shaders to create visually stunning images and use LeRF/NeRF to recreate a game enviroment and sustain accurate queries of game objects
 - In (1), describe what you believe you must accomplish to have a successful project and achieve the grade you expect (i.e. your baseline plan – planning for some unexpected problems would make sense)
-    - We should be able to apply shaders to Genshin
+    - At minimum , we should be able to apply shaders to a video game. 
+    - Ideally, we want a tuned LeRF/NeRF model to get an environment of a game.
 - In (2), describe what you hope to achieve if things go well and you get ahead of schedule (your aspirational plan).
-    - We hope to implement LeRF alongside the shaders. The source code for LeRF is not readily avaialable on nerfstudio.
+    - Our goal is to implement LeRF alongside the shaders. The source code for LeRF is not readily avaialable on nerfstudio which could be an issue.
+    - We might be interested in having shaders and LeRF in other games or game engines.
 
 
 # Schedule
@@ -63,5 +81,6 @@ To resolve the difficulty of attaching NeRF onto our shaders, as a proof of conc
 [This is how we will inject Shaders into Genshin Impact](https://github.com/sefinek24/Genshin-Impact-ReShade)
 
 [LeRF](https://www.lerf.io/)
+
 
 
