@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<!-- saved from url=(0044)https://ld184.github.io/CS184-Final-Project/ -->
+<html lang="en-US"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- Begin Jekyll SEO tag v2.8.0 -->
+<title>Title: GenshinLeRF | CS184-Final-Project</title>
+<meta name="generator" content="Jekyll v3.9.3">
+<meta property="og:title" content="Title: GenshinLeRF">
+<meta property="og:locale" content="en_US">
+<link rel="canonical" href="https://ld184.github.io/CS184-Final-Project/">
+<meta property="og:url" content="https://ld184.github.io/CS184-Final-Project/">
+<meta property="og:site_name" content="CS184-Final-Project">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta property="twitter:title" content="Title: GenshinLeRF">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebSite","headline":"Title: GenshinLeRF","name":"CS184-Final-Project","url":"https://ld184.github.io/CS184-Final-Project/"}</script>
+<!-- End Jekyll SEO tag -->
+
+    <style class="anchorjs"></style><link rel="stylesheet" href="./styles/style.css">
+    <!-- start custom head snippets, customize with your own _includes/head-custom.html file -->
+
+<!-- Setup Google Analytics -->
+
+
+
+<!-- You can set your favicon here -->
+<!-- link rel="shortcut icon" type="image/x-icon" href="/CS184-Final-Project/favicon.ico" -->
+
+<!-- end custom head snippets -->
+
+  </head>
+  <body>
+    <div class="container-lg px-3 my-5 markdown-body">
+      
+      <h1><a href="https://ld184.github.io/CS184-Final-Project/">CS184-Final-Project</a></h1>
+      
+
+      <h1 id="title-genshinlerf"><strong>Title:</strong> GenshinLeRF</h1>
+
+<h2 id="team-members-pierre-le-rahul-shah-jason-yang-levy-deng"><strong>Team members:</strong> Pierre Le, Rahul Shah, Jason Yang, Levy Deng<a class="anchorjs-link " href="https://ld184.github.io/CS184-Final-Project/#team-members-pierre-le-rahul-shah-jason-yang-levy-deng" aria-label="Anchor" data-anchorjs-icon="" style="font: 1em / 1 anchorjs-icons; padding-left: 0.375em;"></a></h2>
+
+<h1 id="problem-description">Problem Description</h1>
+<p>From lecture and projects we’ve learned how to apply shaders on top of meshes, and with the onset of state of the art rendering techniques using NeRF, we thought it would be interesting to merge the two ideas together – why not try to apply LeRF / NeRF into game scenes, instead of simply pictures.</p>
+
+<h2 id="lots-of-problems-not-many-answers">Lots of Problems, Not many answers<a class="anchorjs-link " href="https://ld184.github.io/CS184-Final-Project/#lots-of-problems-not-many-answers" aria-label="Anchor" data-anchorjs-icon="" style="font: 1em / 1 anchorjs-icons; padding-left: 0.375em;"></a></h2>
+<p>NeRF is fundamentally encoding objects and primitives into a neural network. Demos exist for the application of NeRF in projects like LeRF (Language encoded Radiance Fields), which applies shading on top of scenes indicating primitives that belong to text input. Embedding this technology into a game engine is not trivial either, since the rendering pipeline is fairly complex. This brought to us the idea of shaders, so why not take an existing game, inject shaders into it, and allow NeRF to interact with the rendering engine that way? Unfortunately, the answer to this question is not trivial.</p>
+
+<h2 id="why-it-is-non-trivial">Why it is non-trivial<a class="anchorjs-link " href="https://ld184.github.io/CS184-Final-Project/#why-it-is-non-trivial" aria-label="Anchor" data-anchorjs-icon="" style="font: 1em / 1 anchorjs-icons; padding-left: 0.375em;"></a></h2>
+
+<p>Firstly, released games do not generally support modifications to the game files to add functionality to the game, even for simple graphics modifications. In fact, in most cases, game developers goe out of their way to make it hard for users to modify their game post-production through the use of anti-cheat software. To get our shaders working, we have to modify the rendering pipeline of the game to apply those shaders, which means we have to subvert the anti-cheat, or to use drivers in the GPU themselves to support these shaders.
+Even if we are able to get shaders working, there is no guarantee that NeRF would behave exactly as expected, since we need to capture the frame buffer to feed to NeRF as input, which effectively means we are introducing NeRF as part of the last stage of the rendering pipeline. This means that, although it could allow us to potentially add interesting shading effects - like LeRF - it also means that we need to train models to exploit the encoding provided by NeRF, and these models would be extremely purpose specific. This integration is also non-trivial. One such example of this are features regarding angles, which is not easily obtained from the game software.</p>
+
+<h2 id="our-method-of-attack">Our Method of Attack<a class="anchorjs-link " href="https://ld184.github.io/CS184-Final-Project/#our-method-of-attack" aria-label="Anchor" data-anchorjs-icon="" style="font: 1em / 1 anchorjs-icons; padding-left: 0.375em;"></a></h2>
+
+<p>To resolve our first challenge of making post-modifications to the game files to support shaders, we will use a game which already has either their defense mechanisms subverted (most Unity-derived games fit into this category due to their il2cpp), and an injector working for us, so to allow us to focus solely on creating the shaders and tuning them for the game. To get the scene so that it can be fed into NeRF, we will play around the game files and obtain all of the necessary features required for training the model.</p>
+
+<p>To resolve the difficulty of attaching NeRF onto our shaders, as a proof of concept, we will run NeRF as a separate process on the framebuffer of the game, running entirely separately to avoid the problem of injecting more DLL’s into the games files. Even if the rendering times for LeRF / NeRF are significantly longer than what’s required for a game, we should be alright since they are running semi-independently.</p>
+
+<h1 id="goals-and-deliverables">Goals and Deliverables</h1>
+<ul>
+  <li>What we’re trying to accomplish:
+    <ul>
+      <li>We are attempting to implement shaders in a video game alongside using LeRF / NeRF on video game scenes.</li>
+    </ul>
+  </li>
+  <li>What results we’re going for:
+    <ul>
+      <li>Embedding shaders with LeRF to interact with game engine using injections/mods</li>
+    </ul>
+  </li>
+  <li>Why we think we can accomplish these goals:
+    <ul>
+      <li>NeRF code is open source and we should have computing resources for training any neural network models</li>
+      <li>There is existing documentation and tutorials on how to inject shaders</li>
+    </ul>
+  </li>
+  <li>Answering questions mentioned: - Since this is a graphics class you will likely define the kind of images you will create (e.g. including a photo of a new lighting effect you will simulate).
+    <ul>
+      <li>The image should be a character posing in a scene with shaders in the background or a game scene.</li>
+    </ul>
+  </li>
+</ul>
+<table>
+  <tbody><tr>
+    <td> <img src="./img/1.png"></td>
+    <td><img src="./img/2.png"> </td>
+   </tr> 
+   <tr>
+      <td><img src="./img/3.png"></td>
+      <td><img src="./img/4.png">
+  </td>
+  </tr>
+</tbody></table>
+
+<ul>
+  <li>If you are working on an interactive system, describe what demo you will create.
+    <ul>
+      <li>If we are able to implement LeRF, we should have text input to query any objects in a scene.</li>
+    </ul>
+  </li>
+  <li>Define how you will measure the quality / performance of your system (e.g. graphs showing speedup, or quantifying accuracy).
+    <ul>
+      <li>We measure by the quality of the shaders on the environment as well as the accuracy of LeRF of game objects</li>
+    </ul>
+  </li>
+  <li>What questions do you plan to answer with your analysis?
+    <ul>
+      <li>We hope to implement shaders to create visually stunning images and use LeRF/NeRF to recreate a game enviroment and sustain accurate queries of game objects</li>
+    </ul>
+  </li>
+  <li>In (1), describe what you believe you must accomplish to have a successful project and achieve the grade you expect (i.e. your baseline plan – planning for some unexpected problems would make sense)
+    <ul>
+      <li>At minimum , we expect to be able to apply shaders to a video game.</li>
+      <li>Ideally, we want a tuned LeRF/NeRF model to get an environment of a game.</li>
+    </ul>
+  </li>
+  <li>In (2), describe what you hope to achieve if things go well and you get ahead of schedule (your aspirational plan).
+    <ul>
+      <li>Our goal is to implement LeRF alongside the shaders. We have just obtained the source code for LeRF from the paper’s authors.</li>
+      <li>We might be interested in having shaders and LeRF in other games or game engines.</li>
+    </ul>
+  </li>
+</ul>
+
+<h1 id="schedule">Schedule</h1>
+<ul>
+  <li>Week 1 (week of 04/03/2023 to 04/10/2023):
+    <ul>
+      <li><strong>Finish the Shaders</strong>: be able to have various custom shaders</li>
+      <li>Look into different types of shaders (i.e. fragment shaders)</li>
+      <li>Look into how to obtain the necessary features from the game scene for NeRF studio (angles, positions, etc.)</li>
+    </ul>
+  </li>
+  <li>Week 2 (04/10/2023)
+    <ul>
+      <li><strong>Apply Shaders to Genshin</strong>: Work on injecting shaders to a real game engine</li>
+      <li>Prepare a script for the Milestone Video</li>
+      <li>Start working on the Milestone Status Report Webpage</li>
+    </ul>
+  </li>
+  <li>Week 3 (04/17/2023)
+    <ul>
+      <li>Work on LERF integration</li>
+      <li>Record the Milestone Video</li>
+      <li>Finish and submit the Milestone Status Report Webpage</li>
+      <li>Make initial presentation draft</li>
+    </ul>
+  </li>
+  <li>Week 4 (04/24/2023)
+    <ul>
+      <li>Prepare for final presentation with a mock presentation</li>
+      <li>Give final presentation</li>
+      <li>Fill out <a href="https://forms.gle/3HUE1mw6CSf8JkJY8">Peer Reviews</a>.</li>
+    </ul>
+  </li>
+</ul>
+
+<h1 id="resources">Resources</h1>
+<!-- Pls put a line between citations -->
+<p><a href="https://github.com/sefinek24/Genshin-Impact-ReShade">This is how we will inject Shaders into Genshin Impact</a></p>
+
+<p><a href="https://www.lerf.io/">LeRF (Language Embedded Radiance Fields)</a></p>
+
+<p><a href="https://github.com/kerrj/lerf">LeRF Code</a></p>
+
+<p><a href="https://github.com/nerfstudio-project/nerfstudio">NerfStudio</a></p>
+
+<p><a href="https://developers.google.com/ar">ARCore</a></p>
+
+
+      
+    </div>
+    <script src="./scripts/anchor.min.js" integrity="sha256-lZaRhKri35AyJSypXXs4o6OPFTbTmUoltBbDCbdzegg=" crossorigin="anonymous"></script>
+    <script>anchors.add();</script>
+  
+
+</body></html>
