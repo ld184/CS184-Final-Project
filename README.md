@@ -32,12 +32,12 @@ We have acquired the code for LeRF and have integrated it into NeRF studio. We a
 
 <table>
   <tr>
-    <td> <img src="images/shaders1.png" ></td>
-    <td><img src="images/shaders2.png" > </td>
+    <td> <img src="images/1.png" ></td>
+    <td><img src="images/2.png" > </td>
   </tr> 
   <tr>
-    <td><img src="images/nerf1.png"></td>
-    <td><img src="images/nerf2.png"></td>
+    <td><img src="images/3.png"></td>
+    <td><img src="images/4.png"></td>
   </tr>
 </table>
 
