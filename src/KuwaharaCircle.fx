@@ -6,10 +6,13 @@
 	This shader applies a Kuwahara filter using an optimized method for extracting the image mean and variance.
 	
 	Kuwahara filter. (2020, May 01). Retrieved October 17, 2020, from https://en.wikipedia.org/wiki/Kuwahara_filter
-	
+
 	Kyprianidis, J. E., Kang, H., &amp; Dã¶Llner, J. (2009). Image and Video Abstraction by Anisotropic Kuwahara Filtering.
 	Computer Graphics Forum, 28(7), 1955-1963. doi:10.1111/j.1467-8659.2009.01574.x
 */
+// We need Compute Shader Support
+#include "Reshade.fxh"	
+
 #ifndef OILIFY_SIZE
 	#define OILIFY_SIZE 8
 #endif
@@ -36,6 +39,36 @@ namespace Kuwahara
 {
 	texture texColor : COLOR;
 	texture sample_out : COLOR;
+
+	texture2D K0
+	{
+		// The texture dimensions (default: 1x1).
+		Width = K_SIZE;
+		Height = K_SIZE;
+		
+		// The number of mipmaps including the base level (default: 1).
+		MipLevels = 1;
+		
+		// The internal texture format (default: RGBA8).
+		// Available formats:
+		//   R8, R16, R16F, R32F
+		//   RG8, RG16, RG16F, RG32F
+		//   RGBA8, RGBA16, RGBA16F, RGBA32F
+		//   RGB10A2
+		Format = R32F;
+
+		// Unspecified properties are set to the defaults shown here.
+	};
+
+	storage2D K0Storage
+	{
+		// The texture to be used as storage.
+		Texture = K0;
+
+		// The mipmap level of the texture to fetch/store.
+		MipLevel = 0;
+	};
+
 
 	sampler sBackBuffer{Texture = texColor;};
 	sampler sK0{Texture = K0;};
@@ -65,28 +98,6 @@ namespace Kuwahara
 					"detailed image.";
 		ui_min = 1; ui_max = 4;
 	> = 1;
-
-	
-	texture2D K0
-	{
-		// The texture dimensions (default: 1x1).
-		Width = K_SIZE;
-		Height = K_SIZE;
-		
-		// The number of mipmaps including the base level (default: 1).
-		MipLevels = 1;
-		
-		// The internal texture format (default: RGBA8).
-		// Available formats:
-		//   R8, R16, R16F, R32F
-		//   RG8, RG16, RG16F, RG32F
-		//   RGBA8, RGBA16, RGBA16F, RGBA32F
-		//   RGB10A2
-		Format = R32F;
-
-		// Unspecified properties are set to the defaults shown here.
-	};
-
 
 	// Vertex shader generating a triangle covering the entire screen
 	void PostProcessVS(in uint id : SV_VertexID, out float4 position : SV_Position, out float2 texcoord : TEXCOORD)
@@ -121,9 +132,10 @@ namespace Kuwahara
 		
 		for (int i = 0; i < K_SIZE; i++) {
 			for (int j = 0; j < K_SIZE; j++) {
-				tex2Dstore(K0, [i * K_SIZE + j] = X0[i * K_SIZE + j] 
+				tex2Dstore(K0Storage, float2(i, j), X0[i * K_SIZE + j] 
 					* Gss[(K_SIZE * K_SIZE - 1) - (i * K_SIZE + j)]
 					* Gsr[i * K_SIZE + j]);
+				// tex2Dstore(K0Storage, int2(i, j), float4(0, 0, 0, 0));
 			}
 		}
 	
@@ -157,7 +169,7 @@ namespace Kuwahara
 					float3 c = tex2D(sBackBuffer, texcoord + ijVec * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)).rgb;
 					for (int k = 0; k < SLICES; k++) {
 						float2 v_0to1 = float2(0.5, 0.5) + v;
-						float w = text2D(sK0, v_0to1).r;
+						float w = tex2D(sK0, v_0to1).r;
 						float3 temp = c * w;
 						m[k] += float4(temp.x, temp.y, temp.z, w);
 						s[k] += c * c * w;
@@ -179,18 +191,26 @@ namespace Kuwahara
 		}
 		color = o.rgb / o[3];
 	}
+	
+	technique KuwaharaCompute<ui_tooltip = "KuwaharaCircle is a revised version of the normal kuwahara filter,\n"
+							  "By: Levy\n\n"
+							  "OILIFY_SIZE: Changes the size of the filter used.\n"
+							  "OILIFY_ITERATIONS: Ranges from 1 to 8."; enabled = true; timeout = 1; >
+	{
+		pass
+		{
+			ComputeShader=ExampleCS0<64, 1, 1>;
+			DispatchSizeX = 1;
+			DispatchSizeY = 1;
+			DispatchSizeZ = 1;
+		}
+	}
 
 	technique KuwaharaCircle<ui_tooltip = "KuwaharaCircle is a revised version of the normal kuwahara filter,\n"
 							  "By: Levy\n\n"
 							  "OILIFY_SIZE: Changes the size of the filter used.\n"
 							  "OILIFY_ITERATIONS: Ranges from 1 to 8.";>
 	{
-		pass {
-			ComputeShader = ExampleCS0<64, 1, 1>;
-			DispatchSizeX = 1;
-			DispatchSizeY = 1;
-			DispatchSizeZ = 1;
-		}
 		pass
 		{
 			VertexShader = PostProcessVS;
