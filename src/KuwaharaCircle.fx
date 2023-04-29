@@ -27,13 +27,18 @@
 	static const int K_SIZE = 32;
 	static const float GAUSSIAN_WEIGHTS[5] = {0.095766,	0.303053,	0.20236,	0.303053,	0.095766};
 	static const float GAUSSIAN_OFFSETS[5] = {-3.2979345488, -1.40919905099, 0, 1.40919905099, 3.2979345488};
-	
+	static const int SLICES = 8;
+
+
+
+
 namespace Kuwahara
 {
 	texture texColor : COLOR;
+	texture sample_out : COLOR;
 
 	sampler sBackBuffer{Texture = texColor;};
-	sampler sSampleout{Texture = sample_out};
+	sampler sK0{Texture = K0;};
 
 	uniform float Sharpness<
 		ui_type = "slider";
@@ -61,12 +66,27 @@ namespace Kuwahara
 		ui_min = 1; ui_max = 4;
 	> = 1;
 
-	uniform int Slices<
-		ui_type = "slider";
-		ui_label = "Scale";
-		ui_tooltip = "This is the kernel size.";
-		ui_min = 1; ui_max = 12;
-	> = 8;
+	
+	texture2D K0
+	{
+		// The texture dimensions (default: 1x1).
+		Width = K_SIZE;
+		Height = K_SIZE;
+		
+		// The number of mipmaps including the base level (default: 1).
+		MipLevels = 1;
+		
+		// The internal texture format (default: RGBA8).
+		// Available formats:
+		//   R8, R16, R16F, R32F
+		//   RG8, RG16, RG16F, RG32F
+		//   RGBA8, RGBA16, RGBA16F, RGBA32F
+		//   RGB10A2
+		Format = R32F;
+
+		// Unspecified properties are set to the defaults shown here.
+	};
+
 
 	// Vertex shader generating a triangle covering the entire screen
 	void PostProcessVS(in uint id : SV_VertexID, out float4 position : SV_Position, out float2 texcoord : TEXCOORD)
@@ -76,67 +96,88 @@ namespace Kuwahara
 		position = float4(texcoord * float2(2.0, -2.0) + float2(-1.0, 1.0), 0.0, 1.0);
 	}
 
-	void SamplePS(float4 vpos : SV_POSITION, float2 texcoord : TEXCOORD, out float3 color : SV_TARGET0)
+	groupshared float Gss[K_SIZE * K_SIZE];
+	groupshared float Gsr[K_SIZE * K_SIZE];
+	groupshared float X0[K_SIZE * K_SIZE];
+
+	void ExampleCS0()
 	{
 		float sigma_r = 0.25 * (K_SIZE - 1);
 		float sigma_s = 0.33 * sigma_r;
 
-		float g_sigma_r = (1/(2 * PI * sigma_r * sigma_r))
-			* exp(-(vpos.x * vpos.x + vpos.y * vpos.y) / (2 * sigma_r * sigma_r));
-		float g_sigma_s = (1/(2 * PI * sigma_s * sigma_s))
-			* exp(-(vpos.x * vpos.x + vpos.y * vpos.y) / (2 * sigma_s * sigma_s));
 
-		float x_y_angle = atan2(vpos.y, vpos.x);
-
+		for (int i = 0; i < K_SIZE; i++) {
+			for (int j = 0; j < K_SIZE; j++) {
+				float x_y_angle = atan2(i, j); 
+				if (x_y_angle <= PI/SLICES && x_y_angle > -1 * PI/SLICES) {
+					Gsr[i * K_SIZE + j] = (1/(2 * PI * sigma_r * sigma_r))
+						* exp(-(i * i + j * j) / (2 * sigma_r * sigma_r));
+					Gss[i * K_SIZE + j] = (1/(2 * PI * sigma_s * sigma_s))
+						* exp(-(i * i + j * j) / (2 * sigma_s * sigma_s));
+					X0[i * K_SIZE + j] = 1;
+				}
+			}
+		}
 		
-
+		for (int i = 0; i < K_SIZE; i++) {
+			for (int j = 0; j < K_SIZE; j++) {
+				tex2Dstore(K0, [i * K_SIZE + j] = X0[i * K_SIZE + j] 
+					* Gss[(K_SIZE * K_SIZE - 1) - (i * K_SIZE + j)]
+					* Gsr[i * K_SIZE + j]);
+			}
+		}
+	
 	}
 
 	void KuwaharaPS(float4 vpos : SV_POSITION, float2 texcoord : TEXCOORD, out float3 color : SV_TARGET0)
 	{
-		float radius = OILIFY_SIZE;
+		int radius = K_SIZE / 2;
+
+		int q = 8;
 		
-		float4 m[Slices];
-		float3 s[Slices];
+		float4 m[SLICES];
+		float3 s[SLICES];
 		
-		for (int k = 0; k < Slices; ++k) {
+		for (int k = 0; k < SLICES; ++k) {
 			m[k] = float4(0, 0, 0, 0);
 			s[k] = float3(0, 0, 0);
 		}
 
-		float pIn = 2.0 * PI / Slices;
+		float pIn = 2.0 * PI / SLICES;
 
-		float2x2 rotationMatrix = { 
+		float2x2 rotationMatrix = float2x2( 
 			cos(pIn), sin(pIn),
-            -sin(pIn), cos(pIn)
-        };   
-
+      		-sin(pIn), cos(pIn)
+		);   
 		for (int j = -radius; j <= radius; j++) {
-			for (int i = -radius; j <= radius; i++) {
+			for (int i = -radius; i <= radius; i++) {
 				float2 ijVec = float2(i, j);
 				float2 v = 0.5 * ijVec / radius;
 				if (dot(v, v) <= 0.25) {
 					float3 c = tex2D(sBackBuffer, texcoord + ijVec * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)).rgb;
-					for (int k = 0; k < Slices; k++) {
-						float w = tex2D(sBackBuffer, texcoord + ijVec * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)).rgb;
+					for (int k = 0; k < SLICES; k++) {
+						float2 v_0to1 = float2(0.5, 0.5) + v;
+						float w = text2D(sK0, v_0to1).r;
+						float3 temp = c * w;
+						m[k] += float4(temp.x, temp.y, temp.z, w);
+						s[k] += c * c * w;
+						v = mul(v, rotationMatrix);
 					}
 				}
 			}
 		}
 		
-		float min_sigma2 = 1e+2;
-		float3 min_color = float3(0, 0, 0);
-		for (int k = 0; k < 4; k++) {
-			m[k] /= n;
-			s[k] = abs(s[k] / n - m[k] * m[k]);
+		float4 o = float4(0, 0, 0, 0);
+		for (int k = 0; k < SLICES; k++) {
+			m[k].rgb /= m[k][3]; // m[k][3] is the same as m[k].w
+			s[k] = abs(s[k] / m[k][3] - m[k].rgb * m[k].rgb);
 
-			float sigma2 = s[k].x + s[k].y + s[k].z;
-			if (sigma2 < min_sigma2) {
-				min_sigma2 = sigma2;
-				min_color = m[k];
-			}
+			float sigma2 = s[k].r + s[k].g + s[k].b;
+			float w = 1.0 / (1.0 + pow(255 * sigma2, 0.5 * q));
+
+			o += float4(m[k].rgb * w, w);
 		}
-		color = min_color;
+		color = o.rgb / o[3];
 	}
 
 	technique KuwaharaCircle<ui_tooltip = "KuwaharaCircle is a revised version of the normal kuwahara filter,\n"
@@ -144,11 +185,11 @@ namespace Kuwahara
 							  "OILIFY_SIZE: Changes the size of the filter used.\n"
 							  "OILIFY_ITERATIONS: Ranges from 1 to 8.";>
 	{
-		pass
-		{
-			VertexShader = PostProcessVS;
-			PixelShader = SamplePS;
-			RenderTarget0 = sample_out;
+		pass {
+			ComputeShader = ExampleCS0<64, 1, 1>;
+			DispatchSizeX = 1;
+			DispatchSizeY = 1;
+			DispatchSizeZ = 1;
 		}
 		pass
 		{
