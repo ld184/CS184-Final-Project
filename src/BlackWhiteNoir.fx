@@ -123,6 +123,22 @@ namespace BlackWhiteNoir
 		}
 		return float3(0, 0, 0);
 	}
+	
+	float random( float2 p )
+	{
+		return frac(sin(dot(p,float2(12.9898,78.233)))*43758.5453123);
+	}
+
+	float3 ColorToDither(float3 color, float2 uv) {
+		float gray = CalculateGray(color);
+		float rand = random(uv);
+
+		if (rand > gray) {
+			return float3(0, 0, 0);
+		} else {
+			return float3(255, 255, 255);
+		}
+	}
 
 	void KuwaharaPS(float4 vpos : SV_POSITION, float2 texcoord : TEXCOORD, out float3 color : SV_TARGET0)
 	{
@@ -187,16 +203,15 @@ namespace BlackWhiteNoir
 
 		if (sqrt(dot(dotx, dotx) + dot(doty, doty)) >= EdgeSlope) {
 			float3 outlineColor = float3(0, 0, 0);
-			if (numBlackPixels < 4) {
-				outlineColor = float3(1, 1, 1);
-			}
+			// if (numBlackPixels < 4) {
+				// outlineColor = float3(255, 255, 255);
+			// }
 			tmpColor = lerp(c, outlineColor, sqrt(dot(dotx, dotx) + dot(doty, doty)) >= EdgeSlope);
 			tmpColor = lerp(c, tmpColor, OutlineOpacity);
 		} else {
-			tmpColor = ColorToBlackWhite(c);
+			// tmpColor = ColorToBlackWhite(c);
+			tmpColor = ColorToDither(c, texcoord);
 		}
-
-		// Set opacity
 
 		color = tmpColor;
 	}
