@@ -1,0 +1,83 @@
+<!DOCTYPE HTML>
+<!--
+	Hyperspace by HTML5 UP
+	html5up.net | @ajlkn
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+-->
+<html>
+	<head>
+		<title>Shaders</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<link rel="stylesheet" href="assets/css/main.css" />
+		<noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
+	</head>
+	<body class="is-preload">
+
+		<!-- Header -->
+			<header id="header">
+				<a href="index.html" class="title">Shaders</a>
+				<nav>
+					<ul>
+						<li><a href="index.html">Home</a></li>
+						<li><a href="shaders.html" class="active">Shaders</a></li>
+						<li><a href="nerf.html">NeRF</a></li>
+					</ul>
+				</nav>
+			</header>
+
+		<!-- Wrapper -->
+			<div id="wrapper">
+
+				<!-- Main -->
+					<section id="main" class="wrapper">
+						<div class="inner">
+							<h1 class="major">Genshin Shaders</h1>
+							<span class="image fit"><img src="images/Pencil.png" alt="" /></span>
+							<p>The first part of our project was to create custom shaders for Genshin Impact, and we broke down this task into multiple parts:</p>
+							<ul>
+								<li>Injecting Shaders into Genshin Impact</li>
+								<li>Creating the Kuwahara Filters</li>
+								<li>Creating the Noir Shaders</li>
+								<li>Creating the Cel Shaders</li>
+								<li>Creating the Anime/Manga Shaders</li>
+							</ul>
+							<h3>Injecting Shaders into Genshin Impact</h3>
+							<p>In order to do this, we first needed to find a way to inject shaders into the game. Shaders are part of the rendering pipeline that most games do not expose to the end user, as game developers generally do not want the end user to make any modifications to their game. Such modifications are protected through the use of Anti-Cheat systems. Genshin Impact has an anti-cheat built in, and we found a way to bypass the anti-cheat and inject our own shaders.
+							</p>
+							<p>We were able to find the <a href="https://github.com/sefinek24/Genshin-Impact-ReShade">Genshin-Impact-ReShade</a> repository on GitHub that accomplished this exact task, and upon installation onto a Windows machine, we were able to inject the built-in shaders.</p>
+							<p>These shaders are written using <a href="https://reshade.me/">ReShade FX</a>, which is a shading language and compiler whose syntax is very closely related to HLSL.</p>
+							<p>To avoid getting Levy's actual Genshin Impact account from being banned, Levy created a new account for this project.</p>
+							
+							<h3>Creating the Kuwahara Filters</h3>
+							<p>The first shader that we tackled was the Kuwahara Filter. The Kuwahara filter creates a painting-like flattening effect along the local feature directions, while preserving shape boundaries. This approach preserves edges, and we chose this approach over bilateral filters and mean shift filters due to its effectiveness over high and low contrast images. We created three different versions of the Kuwahara Filter: one based on square quadrants, one based on circular kernels, and one based on anisotropic kernels.</p>
+							<p>To create the Kuwahara filter based on square quadrants, we create a square filter that has four square quadrants that are each radius by radius large and overlap by one pixel, which is the current pixel that is being processed.</p>
+							<img src="images/square filters.png" height="25%">
+							<p>If we let |W_k| = (radius + 1)^2, we calculate the mean, m_k as the following:</p>
+							<img src="images/square filters.png" height="25%">
+							<p>We created a compute shader dynamically generated gaussian textures.</p>
+						</div>
+					</section>
+
+			</div>
+
+		<!-- Footer -->
+			<footer id="footer" class="wrapper alt">
+				<div class="inner">
+					<ul class="menu">
+						<li>&copy; Untitled. All rights reserved.</li><li>Design: <a href="http://html5up.net">HTML5 UP</a></li>
+					</ul>
+				</div>
+			</footer>
+
+		<!-- Scripts -->
+			<script src="assets/js/jquery.min.js"></script>
+			<script src="assets/js/jquery.scrollex.min.js"></script>
+			<script src="assets/js/jquery.scrolly.min.js"></script>
+			<script src="assets/js/browser.min.js"></script>
+			<script src="assets/js/breakpoints.min.js"></script>
+			<script src="assets/js/util.js"></script>
+			<script src="assets/js/main.js"></script>
+
+	</body>
+</html>
