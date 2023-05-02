@@ -6,7 +6,7 @@
 -->
 <html>
 	<head>
-		<title>Live Streaming to NeRF</title>
+		<title>NeRFBridge</title>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
 		<link rel="stylesheet" href="assets/css/main.css" />
@@ -16,7 +16,7 @@
 
 		<!-- Header -->
 			<header id="header">
-				<a href="index.html" class="title">Live Streaming to NeRF</a>
+				<a href="index.html" class="title">NeRFBridge</a>
 				<nav>
 					<ul>
 						<li><a href="index.html">Home</a></li>
@@ -32,30 +32,45 @@
 				<!-- Main -->
 					<section id="main" class="wrapper">
 						<div class="inner">
-							<h1 class="major">asdf asdf asdf nerf here</h1>
-							<span class="image fit"><img src="images/Pencil.png" alt="" /></span>
-							<p>The first part of our project was to create custom shaders for Genshin Impact, and we broke down this task into multiple parts:</p>
-							<ul>
-								<li>Injecting Shaders into Genshin Impact</li>
-								<li>Creating the Kuwahara Filters</li>
-								<li>Creating the Noir Shaders</li>
-								<li>Creating the Cel Shaders</li>
-								<li>Creating the Anime/Manga Shaders</li>
-							</ul>
-							<h3>Injecting Shaders into Genshin Impact</h3>
-							<p>In order to do this, we first needed to find a way to inject shaders into the game. Shaders are part of the rendering pipeline that most games do not expose to the end user, as game developers generally do not want the end user to make any modifications to their game. Such modifications are protected through the use of Anti-Cheat systems. Genshin Impact has an anti-cheat built in, and we found a way to bypass the anti-cheat and inject our own shaders.
+							<h1 class="major">Connecting a Game Engine to NeRF-Studio</h1>
+							<span class="image fit"><img src="images/design.png" alt="" /></span>
+							<p>One of the current limitations of NeRF-Studio is the incompatibility with real-time rendering engines, due to the fact that the original research is not tuned to that purpose.
+								It is majorly nontrivial, however, to create this compatibility bridge, and in consideration for the limitations and expansiveness of cloud compute decided to create NeRFBridge.
+								As the design stands, NeRFBridge supports any mode of input, as long as the device can obtain pose information, capture image buffer, and support basic connectivity.
 							</p>
-							<p>We were able to find the <a href="https://github.com/sefinek24/Genshin-Impact-ReShade">Genshin-Impact-ReShade</a> repository on GitHub that accomplished this exact task, and upon installation onto a Windows machine, we were able to inject the built-in shaders.</p>
-							<p>These shaders are written using <a href="https://reshade.me/">ReShade FX</a>, which is a shading language and compiler whose syntax is very closely related to HLSL.</p>
-							<p>To avoid getting Levy's actual Genshin Impact account from being banned, Levy created a new account for this project.</p>
+							<p> In this particular application, we made a couple core modifications to the existing NeRFStudio source code:</p>
+							<ul>
+								<li>Changing to <code>IterableDataset</code> underneath the dataloader, so that NeRF-studio is not bottlenecked by the amount of GPU memory.</li>
+								<li>Adjusting the Cache Datamanager to synchronize the IterableDataset with TCP packets.</li>
+								<li>Modifying the Dataloader to synchronize with TCP updates using condition variables.</li>
+								<li><code>StreamDataset</code>storess the received files to disk and updates <code>DataManagerConfigOutputs</code> accordingly.</li>
+								<li>Adjusting the Stream DataParser to initialize camera configurations over TCP.</li>
+							</ul>
+							<h3>Design Choices and Detail Technical Approaches</h3>
+							<p>The fundamental consideration when creating this design is the acknowledgement that services, and most likely future services related to NeRF, will definitely be offered from the cloud. This quickly
+								narrowed out multiple designs that is local in implementation, as such as using a double-buffer implementation with shared memory. Within the same vein, the idea of embedding NeRF-studio into the game engine is
+								unfavorable. By process of elimination, we needed an IPC implementation, and the only one that is fit for this kind of purpose is TCP.
+							</p>
+							<p>
+								That leaves the actual process of synchronizing a neural network with a data-stream, which means our modifications to the source code underneath starts with substituting the <code>Dataset</code> implementaton with
+								<code>IterableDataset</code>, but we also introduces a synchronization concern - the Pytorch NN will train in real time as the Dataset is updating, and so we would need to synchronize the datamanger and dataloader to not
+								feed the next batch of data until the underlying Dataset has syncrhonized with the TCP connection. Conditional Variables are built for this exact purpose, and so we would attach a mutex lock to the underlying dataset so that
+								while the asynchronous thread modifies the dataset from polling the TCP connection, the next batch of code will wait until the update is completed. This way, we can stall training in the right moments to inject new data into 
+								our <code>IterableDataset</code>.
+							</p>
 							
-							<h3>Creating the Kuwahara Filters</h3>
-							<p>The first shader that we tackled was the Kuwahara Filter. The Kuwahara filter creates a painting-like flattening effect along the local feature directions, while preserving shape boundaries. This approach preserves edges, and we chose this approach over bilateral filters and mean shift filters due to its effectiveness over high and low contrast images. We created three different versions of the Kuwahara Filter: one based on square quadrants, one based on circular kernels, and one based on anisotropic kernels.</p>
-							<p>To create the Kuwahara filter based on square quadrants, we create a square filter that has four square quadrants that are each radius by radius large and overlap by one pixel, which is the current pixel that is being processed.</p>
-							<img src="images/square filters.png" height="25%">
-							<p>If we let |W_k| = (radius + 1)^2, we calculate the mean, m_k as the following:</p>
-							<img src="images/square filters.png" height="25%">
-							<p>We created a compute shader dynamically generated gaussian textures.</p>
+
+							<p>
+								That concludes the design for the NeRFStudio server. The game engine, therefore, would act as a client that sends over data by capturing the framebuffer and sending it over the TCP connection. However, capturing the framebuffer
+								every frame and sending that over a TCP connection is a terrible idea - not only does the game engine need to wait for vsync so the image isn't mangled, but also that it triggers a gpu call to retrieve the final buffer. The idea is that we want to do this as minimally as 
+								possible, but enough to capture changes in the view so NeRF receives plenty of training data. Due to the fact that we have the camera's global transform, we can approximate this by checking if the transform of the camera is sufficiently different
+								from the previous frame. For less priviledged framebuffer capture methods where this is not possible, this is best approximated with a compute shader that does entropy calculation with the previous captured frame, or even simpler, using velocity estimation.
+								In our demo, since the character moves at a constant speed, we determined that sending a frame 3 times every second is sufficient for good performances.
+							</p>
+
+							<p> As with the diagram shown above, the design is centered around data flow, considering that fundamentally this is a problem of synchronizing an ideal stream over ML training, and what we've observed is that with a game engine, the neural net almost fully converges in the first 10 seconds, which means that it is possible to query the neural net for distant scenery, considering That
+								fundamentally the neural net is encoding and compressing memory about some environment.
+							</p>
 						</div>
 					</section>
 
