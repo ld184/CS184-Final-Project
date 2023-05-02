@@ -27,12 +27,11 @@
 		}\
 	
 	static const float PI = 3.1415926536;
-	static const int K_SIZE = 32;
+	static const int K_SIZE = 12;
 	static const float GAUSSIAN_WEIGHTS[5] = {0.095766,	0.303053,	0.20236,	0.303053,	0.095766};
 	static const float GAUSSIAN_OFFSETS[5] = {-3.2979345488, -1.40919905099, 0, 1.40919905099, 3.2979345488};
 	static const int SLICES = 8;
-
-
+	static bool texge = false;
 
 
 namespace Kuwahara
@@ -82,6 +81,15 @@ namespace Kuwahara
 		ui_step = 0.001;
 	> = 1;
 
+	uniform bool gen<
+		ui_type = "slider";
+		ui_label = "Sharpness";
+		ui_tooltip = "Higher settings result in a sharper image, while lower values give the\n"
+					"image a more simplified look.";
+		ui_min = 0; ui_max = 1;
+		ui_step = 0.001;
+	> = false;
+
 	uniform float Tuning<
 		ui_type = "slider";
 		ui_label = "Anistropy Tuning";
@@ -113,32 +121,33 @@ namespace Kuwahara
 
 	void ExampleCS0()
 	{
-		float sigma_r = 0.25 * (K_SIZE - 1);
-		float sigma_s = 0.33 * sigma_r;
+		if (!texge) {
+			float sigma_r = 0.25 * (K_SIZE - 1);
+			float sigma_s = 0.33 * sigma_r;
 
-
-		for (int i = 0; i < K_SIZE; i++) {
-			for (int j = 0; j < K_SIZE; j++) {
-				float x_y_angle = atan2(i, j); 
-				if (x_y_angle <= PI/SLICES && x_y_angle > -1 * PI/SLICES) {
-					Gsr[i * K_SIZE + j] = (1/(2 * PI * sigma_r * sigma_r))
-						* exp(-(i * i + j * j) / (2 * sigma_r * sigma_r));
-					Gss[i * K_SIZE + j] = (1/(2 * PI * sigma_s * sigma_s))
-						* exp(-(i * i + j * j) / (2 * sigma_s * sigma_s));
-					X0[i * K_SIZE + j] = 1;
+			for (int i = 0; i < K_SIZE; i++) {
+				for (int j = 0; j < K_SIZE; j++) {
+					float x_y_angle = atan2(i, j); 
+					if (x_y_angle <= PI/SLICES && x_y_angle > -1 * PI/SLICES) {
+						// Gsr[i * K_SIZE + j] = (1/(2 * PI * sigma_r * sigma_r))
+						// 	* exp(-(i * i + j * j) / (2 * sigma_r * sigma_r));
+						// Gss[i * K_SIZE + j] = (1/(2 * PI * sigma_s * sigma_s))
+						// 	* exp(-(i * i + j * j) / (2 * sigma_s * sigma_s));
+						X0[i * K_SIZE + j] = 1;
+					}
 				}
 			}
-		}
-		
-		for (int i = 0; i < K_SIZE; i++) {
-			for (int j = 0; j < K_SIZE; j++) {
-				tex2Dstore(K0Storage, float2(i, j), X0[i * K_SIZE + j] 
-					* Gss[(K_SIZE * K_SIZE - 1) - (i * K_SIZE + j)]
-					* Gsr[i * K_SIZE + j]);
-				// tex2Dstore(K0Storage, int2(i, j), float4(0, 0, 0, 0));
+			
+			for (int i = 0; i < K_SIZE; i++) {
+				for (int j = 0; j < K_SIZE; j++) {
+					tex2Dstore(K0Storage, float2(i, j), X0[i * K_SIZE + j] 
+						* Gss[(K_SIZE * K_SIZE - 1) - (i * K_SIZE + j)]
+						* Gsr[i * K_SIZE + j]);
+					// tex2Dstore(K0Storage, int2(i, j), float4(0, 0, 0, 0));
+				}
 			}
+			texge=true;
 		}
-	
 	}
 
 	void KuwaharaPS(float4 vpos : SV_POSITION, float2 texcoord : TEXCOORD, out float3 color : SV_TARGET0)
@@ -169,7 +178,7 @@ namespace Kuwahara
 					float3 c = tex2D(sBackBuffer, texcoord + ijVec * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)).rgb;
 					for (int k = 0; k < SLICES; k++) {
 						float2 v_0to1 = float2(0.5, 0.5) + v;
-						float w = tex2D(sK0, v_0to1).r;
+						float w = tex2D(sK0, v_0to1).x;
 						float3 temp = c * w;
 						m[k] += float4(temp.x, temp.y, temp.z, w);
 						s[k] += c * c * w;
@@ -195,14 +204,13 @@ namespace Kuwahara
 	technique KuwaharaCompute<ui_tooltip = "KuwaharaCircle is a revised version of the normal kuwahara filter,\n"
 							  "By: Levy\n\n"
 							  "OILIFY_SIZE: Changes the size of the filter used.\n"
-							  "OILIFY_ITERATIONS: Ranges from 1 to 8."; enabled = true; timeout = 1; >
+							  "OILIFY_ITERATIONS: Ranges from 1 to 8.";>
 	{
 		pass
 		{
-			ComputeShader=ExampleCS0<64, 1, 1>;
+			ComputeShader=ExampleCS0<1, 1, 1>;
 			DispatchSizeX = 1;
 			DispatchSizeY = 1;
-			DispatchSizeZ = 1;
 		}
 	}
 
@@ -210,7 +218,7 @@ namespace Kuwahara
 							  "By: Levy\n\n"
 							  "OILIFY_SIZE: Changes the size of the filter used.\n"
 							  "OILIFY_ITERATIONS: Ranges from 1 to 8.";>
-	{
+	{		
 		pass
 		{
 			VertexShader = PostProcessVS;

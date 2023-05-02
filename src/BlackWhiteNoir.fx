@@ -13,9 +13,14 @@
 // We need Compute Shader Support
 #include "Reshade.fxh"	
 
+#ifndef DITHER_NOQUANTIZATION
+#define DITHER_NOQUANTIZATION 0
+#endif
+
 namespace BlackWhiteNoir
 {
 	texture texColor : COLOR;
+	texture texDepth : DEPTH;
 	texture sample_out : COLOR;
 
 	texture2D K0
@@ -47,9 +52,17 @@ namespace BlackWhiteNoir
 		MipLevel = 0;
 	};
 
+	texture2D texAlphaCheckerboard < source = "hatched.jpg"; > 
+	{ 
+		Width = BUFFER_WIDTH; 
+		Height = BUFFER_HEIGHT;
+		Format = RGBA8;
+	};
 
 	sampler sBackBuffer{Texture = texColor;};
 	sampler sK0{Texture = K0;};
+	sampler sChecker{Texture = texAlphaCheckerboard;};
+	sampler sDepth{Texture = texDepth;};
 
 	uniform float LineWidth<
 		ui_type = "slider";
@@ -82,6 +95,32 @@ namespace BlackWhiteNoir
 		ui_label = "Outline Opacity";
 	> = 1.0;
 
+	uniform float fDithering <
+    ui_label = "Dithering";
+    ui_type  = "drag";
+    ui_min   = 0.0;
+    ui_max   = 1.0;
+    ui_step  = 0.001;
+	> = 0.5;
+	#if !DITHER_NOQUANTIZATION
+	uniform float fQuantization <
+		ui_label   = "Quantization";
+		ui_tooltip = "Use to simulate lack of colors: 8.0 for 8bits, 16.0 for 16bits etc.\n"
+					"Set to 0.0 to disable quantization.\n"
+					"Only enabled if dithering is enabled as well.";
+		ui_type    = "drag";
+		ui_min     = 0.0;
+		ui_max     = 255.0;
+		ui_step    = 1.0;
+	> = 0.0;
+	#endif
+
+	uniform int iDitherMode <
+		ui_label = "Dither Mode";
+		ui_type  = "combo";
+		ui_items = "Add\0Multiply\0";
+	> = 0;
+
 	// Vertex shader generating a triangle covering the entire screen
 	void PostProcessVS(in uint id : SV_VertexID, out float4 position : SV_Position, out float2 texcoord : TEXCOORD)
 	{
@@ -111,17 +150,68 @@ namespace BlackWhiteNoir
 		}
 	}
 
+	int get_bayer(int2 i) {
+		static const int bayer[8 * 8] = {
+			0, 48, 12, 60,  3, 51, 15, 63,
+			32, 16, 44, 28, 35, 19, 47, 31,
+			8, 56,  4, 52, 11, 59,  7, 55,
+			40, 24, 36, 20, 43, 27, 39, 23,
+			2, 50, 14, 62,  1, 49, 13, 61,
+			34, 18, 46, 30, 33, 17, 45, 29,
+			10, 58,  6, 54,  9, 57,  5, 53,
+			42, 26, 38, 22, 41, 25, 37, 21
+		};
+		return bayer[i.x + 8 * i.y];
+	}
+
+	//#define fmod(a, b) ((frac(abs(a / b)) * abs(b)) * ((step(a, 0) - 0.5) * 2.0))
+	float2 fmod(float2 a, float2 b) {
+		float2 c = frac(abs(a / b)) * abs(b);
+		return (a < 0) ? -c : c;
+	}
+
+	// Adapted from: http://devlog-martinsh.blogspot.com.br/2011/03/glsl-dithering.html
+	float dither(float x, float2 uv) {
+		#if (__RENDERER__ & 0x10000) // If OpenGL
+		
+		float2 index = fmod(uv * ReShade::ScreenSize, 8.0);
+		float limit  = (float(get_bayer(int2(index)) + 1) / 64.0) * step(index.x, 8.0);
+		
+		#else // DirectX
+
+		int2 index = int2(uv * ReShade::ScreenSize) % 8;
+		float limit = (float(get_bayer(index) + 1) / 64.0) * step(index.x, 8);
+
+		#endif
+		return step(limit, x);
+	}
+
+	float get_luma_linear(float3 color) {
+		return dot(color, float3(0.2126, 0.7152, 0.0722));
+	}
+
 	float CalculateGray(float3 c) {
 		return 0.33 * (c.r + c.g + c.b);
 	}
 
-	float3 ColorToBlackWhite(float3 color) {
-		float threshold = 0.5;
+	float3 ColorToBlackWhite(float3 color, float2 texcoord) {
+		// float threshold_black = 0.66;
+		// float threshold_white = 0.33;
+		// float gray = CalculateGray(color);
+
+		// // custom shading for grays, criss cross texture
+		// if (gray > threshold_black) {
+		// 	return float3(1, 1, 1);
+		// }
+		// if (gray < threshold_white) {
+		// 	return float3(0,0,0);
+		// }
+		// return float3(0.2, 0.2, 0.2);
 		float gray = CalculateGray(color);
-		if (gray > threshold) {
-			return float3(1, 1, 1);
-		}
-		return float3(0, 0, 0);
+		float3 ret = float3(gray, gray, gray);
+		float3 weight = tex2D(sChecker, texcoord).rgb;
+		float depth = tex2D(sDepth, texcoord).r;
+		return floor(ret / 0.1) * 0.1 * weight;
 	}
 	
 	float random( float2 p )
@@ -183,7 +273,7 @@ namespace BlackWhiteNoir
 		doty *= EdgeDetectionAccuracy;
 
 		// get eight surrounding pixels 
-		int numBlackPixels = 0;
+		float numBlackPixels = 0;
 		for (int i = 0, j; i < 3; i++)
 		{
 			j = i - 1;
@@ -192,47 +282,43 @@ namespace BlackWhiteNoir
 			float3 m = GetEdgeSample(texcoord + ReShade::PixelSize * float2( 0, j), false);
 			float3 r = GetEdgeSample(texcoord + ReShade::PixelSize * float2( 1, j), false);
 
-			numBlackPixels += ColorToBlackWhite(l).x;
+			numBlackPixels += ColorToBlackWhite(l, texcoord).x;
 			if (j != 1) { // don't include the original pixel
-				numBlackPixels += ColorToBlackWhite(m).x;
+				numBlackPixels += ColorToBlackWhite(m, texcoord).x;
 			}
-			numBlackPixels += ColorToBlackWhite(r).x;
+			numBlackPixels += ColorToBlackWhite(r, texcoord).x;
 		}
 		
 		float3 tmpColor = float3(0, 0, 0);
 
 		if (sqrt(dot(dotx, dotx) + dot(doty, doty)) >= EdgeSlope) {
-			float3 outlineColor = float3(0, 0, 0);
-			// if (numBlackPixels < 4) {
-				// outlineColor = float3(255, 255, 255);
+			float3 outlineColor = float3(0.8, 0.8, 0.8);
+			// if (numBlackPixels > 1) {
+			// 	outlineColor = float3(0, 0, 0);
 			// }
 			tmpColor = lerp(c, outlineColor, sqrt(dot(dotx, dotx) + dot(doty, doty)) >= EdgeSlope);
 			tmpColor = lerp(c, tmpColor, OutlineOpacity);
 		} else {
-			// tmpColor = ColorToBlackWhite(c);
-			tmpColor = ColorToDither(c, texcoord);
+			tmpColor = ColorToBlackWhite(c, texcoord);
+			// tmpColor = ColorToDither(c, texcoord);
+			// if (fQuantization > 0.0)
+			// 	c = round(c * fQuantization) / fQuantization;
+
+			// float luma = get_luma_linear(c.rgb);
+			// float pattern = dither(luma, uv);
+			
+			// if (iDitherMode == 0) // Add
+			// 	c.rgb += c.rgb * pattern * fDithering;
+			// else                  // Multiply
+			// 	c.rgb *= lerp(1.0, pattern, fDithering);
+			// tmpColor = c;
 		}
 
 		color = tmpColor;
 	}
 
 	
-	
-	technique KuwaharaCompute<ui_tooltip = "BlackWhiteNoir is a revised version of the normal kuwahara filter,\n"
-							  "By: Levy\n\n"
-							  "OILIFY_SIZE: Changes the size of the filter used.\n"
-							  "OILIFY_ITERATIONS: Ranges from 1 to 8."; enabled = true; timeout = 1; >
-	{
-		pass
-		{
-			ComputeShader=ExampleCS0<64, 1, 1>;
-			DispatchSizeX = 1;
-			DispatchSizeY = 1;
-			DispatchSizeZ = 1;
-		}
-	}
-
-	technique KuwaharaCircle<ui_tooltip = "BlackWhiteNoir is a revised version of the normal kuwahara filter,\n"
+	technique Noir<ui_tooltip = "BlackWhiteNoir is a revised version of the normal kuwahara filter,\n"
 							  "By: Levy\n\n"
 							  "OILIFY_SIZE: Changes the size of the filter used.\n"
 							  "OILIFY_ITERATIONS: Ranges from 1 to 8.";>
