@@ -71,6 +71,14 @@
 							<p> As with the diagram shown above, the design is centered around data flow, considering that fundamentally this is a problem of synchronizing an ideal stream over ML training, and what we've observed is that with a game engine, the neural net almost fully converges in the first 10 seconds, which means that it is possible to query the neural net for distant scenery, considering That
 								fundamentally the neural net is encoding and compressing memory about some environment.
 							</p>
+
+							<p>
+								There were a lot of challenges when we tried to implement this feature, including synchronization issues, as well as working with sockets and the communication protocol between the two processes. Obtaining some of the information about the camera of Godot is also not as straight forward, especially since some of the values are not directly reported by the game engine.
+								The main challenge, however, is working with the existing code with NeRFstudio, since we have to figure out a way to fit the new features into the existing code base as to not break the training process.
+							</p>
+
+
+							<span class="image fit"><img src="images/nerf_geometry.png" alt="" /></span>
 						</div>
 					</section>
 
