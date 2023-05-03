@@ -72,11 +72,22 @@
 								fundamentally the neural net is encoding and compressing memory about some environment.
 							</p>
 
+							<h3>Problems Encountered and How We Tackled Them</h3>
 							<p>
 								There were a lot of challenges when we tried to implement this feature, including synchronization issues, as well as working with sockets and the communication protocol between the two processes. Obtaining some of the information about the camera of Godot is also not as straight forward, especially since some of the values are not directly reported by the game engine.
 								The main challenge, however, is working with the existing code with NeRFstudio, since we have to figure out a way to fit the new features into the existing code base as to not break the training process.
 							</p>
-
+							<p>
+								By having a good design that listed out all the modifications before implementation began, the source code is reverse engineered so that there were clear paths of entry. This helped greatly in identifying pitfalls in the original implementation, as well as how to address them.
+							</p>
+							<h3>Lessons Learned</h3>
+							<p>
+								<ul>
+									<li>Creating a Custom Dataloader/Dataparser/Datamanager/Pipeline for an extended PyTorch codebase</li>
+									<li>Create an IPC protocol between different software</li>
+									<li>Socket Programming in Godot and Python.</li>
+								</ul>
+							</p>
 
 							<span class="image fit"><img src="images/nerf_geometry.png" alt="" /></span>
 						</div>

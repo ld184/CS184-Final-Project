@@ -153,18 +153,29 @@
 							<p>If the gradient is greater than a variable called EdgeSlope which we have set to 0.23, we consider this pixel to be along an edge.</p>
 							<p>For pixels along an edge, we draw a white pixel and set the opacity value to be very high.</p>
 							<p>Otherwise, we color in the pixel value with a pencil texture, based on the average color channel's intensity value, 0.33 * (r + g + b).</p>
-							<p>TODO: WRITE ABOUT THE PENCIL TEXTURE</p>
+							<p>The pencil texture is sampled as weights to the color-banded flattening of colors via floor division, in addition to using the linearized depth buffer information to grab edges based upon different z values.</p>
+							<p>This creates the similar effects as a pencil drawing.</p>
 
 							<p>Here is a comparison between the base shaders with the noir pencil shader.</p>
 							<span class="image fit"><img src="images/Normal.png"></span>
 							<span class="image fit"><img src="images/Pencil.png"></span>
 
 							<h3 id="cel">Creating the Cel Shaders</h3>
-							<p>TODO: write description about how the cel shaders were created</p>
+							<p>The Cel/Toon shader is a in essence, another shader which uses floor division to flatten the colors to create discrete transition effect, in addition to creating a bold outlining to hammer in the cartoon effect.
+								To accurately pinpoint the edges, the Z-buffer is sampled to get the relative depth difference from the adjacent pixels to grab the slope of the edge in the spirit of the sobel filter. However, since the game is already
+								cartoon-ish, the effects are not the most apparent.
+							</p>
 
 							<p>Here is a comparison between the base shaders with the cel shader.</p>
 							<span class="image fit"><img src="images/Normal.png"></span>
 							<span class="image fit"><img src="images/Cel.png"></span>
+
+							<h3 id="cel">Problems Encountered and How We Tackled Them</h3>
+							<p>We encountered a lot of problems in building the shader programs. At first, we did not know about the syntax and how the shaders errored, since we did not have any information to debug with. Over time, we learned more about the HLSL-like FX language and were able to start debugging our shader implementation through the console. We also had some design decisions to make for the Noir Shader, since drawing a mixture of black and white borders did not achieve as good as a visual effect as drawing only white borders. There was also an issue that we encountered with the depth buffer, since the foreground and the background are located in different depths. We resolved this by experimenting with only RGB values and only the depth buffer, and we ended up using a combination of both RGB buffers and the depth buffer.</p>
+
+							<h3 id="cel">Lessons Learned</h3>
+							<p>Upon completion of this project, we learned how to write ReshadeFX code and learned how to create shaders using a different rendering engine. We also learned a lot more about the different features of writing shader code, including using different techniques, and creating custom textures.</p>
+							
 
 						</div>
 					</section>
