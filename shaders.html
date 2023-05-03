@@ -11,6 +11,17 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
 		<link rel="stylesheet" href="assets/css/main.css" />
 		<noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
+
+		<script>
+			MathJax = {
+				tex: {
+					inlineMath: [['$', '$'], ['\\(', '\\)']]
+				}
+			};
+		</script>
+		<script async id="MathJax-script"
+				src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js">
+		</script>
 	</head>
 	<body class="is-preload">
 
@@ -53,18 +64,38 @@
 
 							<h4>Kuwahara Filter Based on Square Quadrants</h4>
 							<p>To create the Kuwahara filter based on square quadrants, we create a square filter that has four square quadrants that are each radius by radius large and overlap by one pixel, which is the current pixel that is being processed.</p>
-							<img src="images/square filters.png" height="25%">
+							$$
+							\begin{aligned}
+							& W_0=\left[x_0-r,\ x_0\right] \times\left[y_0,\ y_0+r\right], \\
+							& W_1=\left[x_0,\ x_0+r\right] \times\left[y_0,\ y_0+r\right], \\
+							& W_2=\left[x_0,\ x_0+r\right] \times\left[y_0-r,\ y_0\right], \\
+							& W_3=\left[x_0-r,\ x_0\right] \times\left[y_0-r,\ y_0\right].
+							\end{aligned}
+							$$
 							<p>First, we calculate the following:</p>
-							<img src="images/square wk.png" height="25%">
+							$$
+							|W_k|=\left(r+1\right)^2
+							$$
 							<p>|W_k| is equivalent to the number of pixels in the quadrant we are computing, with r defined as radius.</p>
 							<p>Then, using the previous definition, we calculate the mean, m_k as the following:</p>
-							<img src="images/square mean.png" height="25%">
+							$$
+							\begin{aligned}
+							&m_k=\frac{1}{\left|W_k\right|} \sum_{(x, y) \in W_k} f(x, y).\\
+							\end{aligned}
+							$$
 							<p>We calculate the variance as the average of the square of the distance of each pixel to the mean, as the following:</p>
-							<img src="images/square variance.png" height="25%">
+							$$
+							\begin{aligned}
+							s_k^2 &=\frac{1}{\left|W_k\right|} \sum_{(x, y) \in W_k}\left(f(x, y)-m_k\right)^2 \\
+							      &=\frac{1}{\left|W_k\right|} \sum_{(x, y) \in W_k} f^2(x, y)-m_k.
+							\end{aligned}
+							$$
 							<p>In this model, we assume that the variances for each channel color do not correlate with each other, so this means that the final variance for W_k is going to be the following:</p>
-							<img src="images/square final var.png" height="25%">
-							<p>Now, the output value for our pixel at (x0, y0) is goint to be:</p>
-							<img src="images/square result.png" height="25%">
+							$$\sigma_k^2=s_{k, r}^2+s_{k, g}^2+s_{k, b}^2.$$
+							<p>Now, the output value for our pixel at $(x_0, y_0)$ is goint to be:</p>
+							$$
+							F(x_0, y_0) := m_i, \quad\quad i=\text{argmin}_k \sigma_k.
+							$$
 							<p><a href="https://github.com/ld184/CS184-Final-Project/blob/main/src/KuwaharaSquare.fx">Here</a> is the source code for our implementation of the Kuwahara filter based on square quadrants.</p>
 							<p>Here is a comparison between the base shaders with the square kuwahara shader.</p>
 							<span class="image fit"><img src="images/Normal.png"></span>
@@ -72,24 +103,55 @@
 
 							<h4>Kuwahara Filter Based on Circular Kernels</h4>
 							<p>Next, we created the Kuwahara filter based on circular kernels. We first created different sectors of the circular filter that we were going to implement at a time, and this is adjacent to the idea of the square quadrants of the Kuwahara filter that uses the square quadrants. First, we calculate sigma_r and sigma_s to be the following, where the circular kernel's radius, K_size, is defined to be 32:</p>
-							<img src="images/circle sigma r sigma s.png">
-							<p>Then, we can calculate gaussians using standard deviations with sigma_r and sigma_s using the following formula:</p>
-							<img src="images/circle g_sigma.png">
-							<p>Next, we can define our smooth weighting function w_k using the following formula:</p>
-							<img src="images/circle wk.png">
-							<p>Here, the x_k value is convolved with the gaussian that uses standard deviation of sigma_s, then the result is multiplied by sigma_r.</p>
-							<p>Now, the weighted mean m_k at a point (x0, y0) is defined as the following:</p>
-							<img src="images/circle mk.png">
-							<p>The convolution smooths the characteristic function such that the characteristic functions slightly overlap with one another. Also, notice how the sum of w_k is equivalent to a Gaussian filter, so this is why the mean m_k is calculated above.</p>
-							<p>Now, the weighted variance is defined as the following:</p>
-							<img src="images/circle sk.png">
-							<p>The output of our filter is a weighted average of the means with the variances. To refine our weighted average, we define alpha_k to be the following:</p>
-							<img src="images/circle alpha k.png">
-							<p>The final output for a pixel (x0, y0) is the following:</p>
-							<img src="images/circle f x0 y0.png">
-							<br>
+							$$
+							\begin{aligned}
+							\sigma_r & =\frac{1}{2} \cdot \frac{K_{\text {size }}-1}{2}=7.75, \\
+							\sigma_s & =0.33 \cdot \sigma_r,
+							\end{aligned}
+							$$
+
+							<p>Then, we can calculate gaussians using standard deviations with $\sigma_r$ and $\sigma_s$ using the following formula:</p>
+							$$
+							G_\sigma(x, y)=\frac{1}{2 \pi \sigma^2} \exp \left(-\frac{x^2+y^2}{2 \sigma^2}\right)
+							$$
+
+							<p>Next, we can define our smooth weighting function $w_k$ using the following formula:</p>
+							$$
+							w_k=\left(\chi_k \star G_{\sigma_s}\right) \cdot G_{\sigma_r}
+							$$
+
+							<p>Here, the x_k value is convolved with the gaussian that uses standard deviation of sigma_s, then the result is multiplied by $\sigma_r$.</p>
+							<p>Now, the weighted mean $m_k$ at a point $(x_0, y_0)$ is defined as the following:</p>
+							$$
+							m_k=\sum_{(x, y) \in \mathbb{Z}^2} f(x, y) \ w_k\left(x-x_0,\ y-y_0\right)
+							$$
+							
+							<p>The convolution smooths the characteristic function such that the characteristic functions slightly overlap with one another. Also, notice how the sum of $w_k$ is equivalent to a Gaussian filter, so this is why the mean m_k is calculated above.</p>
+							<p>Now, the weighted variance is defined as the following:</p>						
+							$$
+							\begin{aligned}
+							s_k^2 &=\sum_{(x, y) \in \mathbb{Z}^2}\left(f(x, y)-m_k\right)^2 \ w_k\left(x-x_0,\ y-y_0\right) \\
+									&=\sum_{(x, y) \in \mathbb{Z}^2} f^2(x, y) \ w_k\left(x-x_0,\ y-y_0\right)-m_k.
+							\end{aligned}
+							$$
+
+							<p>The output of our filter is a weighted average of the means with the variances. To refine our weighted average, we define $\alpha_k$ to be the following:</p>
+							$$
+							\alpha_k=\frac{1}{1+\left(255 \cdot \sigma_k^2\right)^{q / 2}}.
+							$$
+							
+							<p>The final output for a pixel $(x_0, y_0)$ is the following:</p>
+							$$
+							F\left(x_0, y_0\right):=\frac{\sum_k \alpha_k m_k}{\sum_k \alpha_k} . 
+							$$
+							
 							<p>To implement this, w_k is actually fairly hard to compute, since computing it requires convolutions. Instead of computing w_k for every pixel, one at a time, we create a texture map that we can use to sample w_k that uses bilinear interpolation. Furthermore, since each sector of a circle is equivalent to one sector, rotated multiple times, so the w_k value will be calculated with the following function:</p>
-							<img src="images/circle wk x y.png">
+							$$
+							w_k(x, y)=K_0\left(\left(\begin{array}{l}
+							0.5 \\
+							0.5
+							\end{array}\right)+\frac{R_{-2 \pi k / N}(x, y)}{2 r}\right)
+							$$
 
 							<p>To sample a texture to get w_k, we created a compute shader dynamically using gaussian values that we generate on the fly. We call this texture K0.</p>
 							<p><a href="https://github.com/ld184/CS184-Final-Project/blob/main/src/KuwaharaCircle.fx">Here</a> is the source code for our implementation of the Kuwahara filter based on square quadrants.</p>
@@ -106,61 +168,155 @@
 							<p>This means that we first calculate the structure tensor, then compute the gaussian filter and orientation/anisotropy, and finally filter and return the result.</p>
 							
 							<p>The first step is to calculate the structure tensor from the RGB values of the input. If we let f be the input image, then S_x and S_y are the horizontal and vertical convolution masks of the Sobel edge detection filter:</p>
-							<img src="images/aniso sx sy.png">
-							<p>The approximations of the partial derivaties of f are defined by the following: f_x = S_x convolved with f and f_y = S_y convolved with f.</p>
-							<img src="images/aniso fx fy.png">
-							<p>Now, the structural tensor of f is defined as follows:</p>
-							<img src="images/aniso gij.png">
+							$$
+							S_x=\frac{1}{4}\left(\begin{array}{rrr}
+							+1 & 0 & -1 \\
+							+2 & 0 & -2 \\
+							+1 & 0 & -1
+							\end{array}\right) \quad \text { and } \quad S_y=\frac{1}{4}\left(\begin{array}{rrr}
+							+1 & +2 & +1 \\
+							0 & 0 & 0 \\
+							-1 & -2 & -1
+							\end{array}\right)
+							$$
+							
+							<p>The approximations of the partial derivaties of $f$ are defined by the following: $f_x=S_x$ convolved with $f$ and $f_y= S_y$ convolved with $f$.</p>
+							$$
+							f_x=(S_x \star f) \text { and } f_y=(S_y \star f),
+							$$
+							
+							<p>Now, the structural tensor of ${f}$ is defined as follows:</p>
+							$$
+							\left(g_{i j}\right)=\left(\begin{array}{ll}
+							f_x \cdot f_x & f_x \cdot f_y \\
+							f_x \cdot f_y & f_y \cdot f_y
+							\end{array}\right)=:\left(\begin{array}{ll}
+							E & F \\
+							F & G
+							\end{array}\right)
+							$$
+							
 							<p>To get the structural tensor's eigenvalues and the eigenvector of the minimum rate of change, we do the following:</p>
-							<img src="images/aniso l1 l2.png">
-							<img src="images/aniso t.png">
+							$$
+							\lambda_{1,2}=\frac{E+G \pm \sqrt{(E-G)^2+4 F^2}}{2}.\quad\quad t=\begin{pmatrix}\lambda_1-E\\-F\end{pmatrix}.
+							$$
+							
 							<p>Now, the angle by which the ellipse is rotated is the following:</p>
-							<img src="images/aniso phi.png">
-							<p>We calculate the measure of anisotropy to be the following, with 0 being isotropic and 1 being entirely anisotropic.</p>
-							<img src="images/aniso a.png">
-							<br>
-
+							$$
+							\varphi=\arg t.
+							$$
+							
+							<p>We calculate the measure of anisotropy to be the following, with $0$ being isotropic and 1 being entirely anisotropic.</p>
+							$$
+							A=\frac{\lambda_1-\lambda_2}{\lambda_1+\lambda_2}
+							$$
+							
 							<p>The next step is to compute the gaussian filter and orientation/anisotropy.</p>
 							<p>Recall that the equation of the rotated ellipse is the following:</p>
-							<img src="images/aniso rotated ellipse.png">
+							$$
+							\frac{(x \cos \varphi-y \sin \varphi)^2}{a^2}+\frac{(x \sin \varphi+y \cos \varphi)^2}{b^2}=1.
+							$$
+							
 							<p>Once we write this equation in standard form and plug in the values into the equation, we get the following:</p>
-							<img src="images/aniso p x y.png">
-							<img src="images/aniso abcdef.png">
-							<p>We calculate the horizontal extrema where the partial derivative in the y direction vanishes to be as follows:</p>
-							<img src="images/aniso dp dy.png">
-							<p>After we substitute this value of y into the ellipse, we get the equation:</p>
-							<img src="images/aniso a minus e2.png">
+							$$
+							P(x, y)=A x^2+B y^2+C x+D y+E x y+F=0,
+							\quad
+							\quad
+							\begin{aligned}
+							& A=a^2 \sin ^2 \varphi+b^2 \cos ^2 \varphi, \\
+							& B=a^2 \cos ^2 \varphi+b^2 \sin ^2 \varphi \\
+							& C=0, \\
+							& D=0, \\
+							& E=2(a^2-b^2)\sin\varphi\cos\varphi, \\
+							& F=-a^2 b^2 .
+							\end{aligned}
+							$$
+
+							<p>We calculate the horizontal extrema where the partial derivative in the $y$ direction vanishes to be as follows:</p>
+							$$
+							\frac{\partial P}{\partial y}=2 B y+E x=0 \quad \Leftrightarrow \quad y=\frac{-E x}{2 B}
+							$$
+
+							<p>After we substitute this value of $y$ into the ellipse, we get the equation:</p>
+							$$
+							\left(A-\frac{E^2}{4 B}\right) x^2+F=0
+							$$
+
 							<p>This ellipse's horizontal and vertical extrema are as follows:</p>
-							<img src="images/aniso x.png">
-							<img src="images/aniso y.png">
-							<p>If we want to adjust the ellipse's eccentricity, or how flat/round the ellipse's shape is, we can introduce a new variable called α. With a very large α value, the a and b axes converge to 1, and with α = 1, we have a maximum eccentricity of 4. The values a and b are governed by this formula:</p>
-							<img src="images/aniso a b.png">
-							<p>Now, to get the value w_k(x, y), we sample from the texture K0 that is defined in the above section using circular filters to get the following:</p>
-							<img src="images/aniso wk x y.png">
-							<p>Note that in order to calculate w_k, we need the formula for S, which is:</p>
-							<img src="images/aniso s.png">
-							<p>Also note that S * R matrix maps points from the ellipse to a circle of radius 0.5.</p>
+							$$
+							x= \pm \sqrt{\frac{F}{\frac{E^2}{4 B}-A}}= \pm \sqrt{a^2 \cos ^2 \varphi+b^2 \sin ^2 \varphi} . 
+							\quad 
+							\quad 
+							y= \pm \sqrt{a^2 \sin ^2 \varphi+b^2 \cos ^2 \varphi}
+							$$
+
+							<p>If we want to adjust the ellipse's eccentricity, or how flat/round the ellipse's shape is, we can introduce a new variable called a. With a very large a value, the $a$ and $b$ axes converge to 1 , and with $\alpha=1$, we have a maximum eccentricity of 4 . The values a and $b$ are governed by this formula:</p>
+							$$a=\frac{\alpha+A}{\alpha} r \quad \text{ and } \quad b=\frac{\alpha}{\alpha+A} r$$
+
+							<p>Now, to get the value $w_k(x, y)$, we sample from the texture $K_0$ that is defined in the above section using circular filters to get the following:</p>
+							$$
+							w_k(x, y)=K_0\left(\left(\begin{array}{c}
+							0.5 \\
+							0.5
+							\end{array}\right)+R_{-2 \pi k / N} S R_{-\varphi}(x, y)\right).
+							$$
+							
+							<p>Note that in order to calculate $w_k$, we need the formula for $S$, which is:</p>
+							$$
+							S=\left(\begin{array}{cc}
+							\frac{1}{2 a} & 0 \\
+							0 & \frac{1}{2 b}
+							\end{array}\right),
+							$$
+							<p>Also note that $S$ * $R$ matrix maps points from the ellipse to a circle of radius $0.5$.</p>
 
 							<p>We then apply the same logic as in the circular filter to compute the result of the filter.</p>
 							<p><a href="https://github.com/ld184/CS184-Final-Project/blob/main/src/Kuwahara.fx">Here</a> is the source code for our implementation of the Kuwahara filter based on square quadrants.</p>
 
 							<h3 id="noir">Creating the Noir Shaders</h3>
 							<p>In order to compute the noir shaders, we first need to determine whether a pixel is along an edge. We do this by implementing the sobel filter, and if the value output by the sobel filter is greater than a threshold, we can say that the pixel is along an edge. We compute that as follows:</p>
-							<img src="images/noir sobel.png">
-							<p>Here, note that the G_x and G_y are the horizontal and vertical derivative approximations, and A is the source image. The two matrices are each convolved with the source image A.</p>
+							$$
+							\mathbf{G}_x=\left[\begin{array}{ccc}
+							+1 & 0 & -1 \\
+							+2 & 0 & -2 \\
+							+1 & 0 & -1
+							\end{array}\right] * \mathbf{A} \quad \text { and } \quad \mathbf{G}_y=\left[\begin{array}{ccc}
+							+1 & +2 & +1 \\
+							0 & 0 & 0 \\
+							-1 & -2 & -1
+							\end{array}\right] * \mathbf{A}
+							$$
+							<p>Here, note that the $\mathbf G_x$ and $\mathbf G_y$ are the horizontal and vertical derivative approximations, and $\mathbf A$ is the source image. The two matrices are each convolved with the source image $\mathbf A$.</p>
 							<p>Using these approximations, we calculate the gradient as follows:</p>
-							<img src="images/noir gradient.png">
-							<p>If the gradient is greater than a variable called EdgeSlope which we have set to 0.23, we consider this pixel to be along an edge.</p>
+							$$
+							\mathbf{G}=\sqrt{\mathbf{G}_x^2+\mathbf{G}_y^2}
+							$$
+							<p>If the gradient is greater than a variable called EdgeSlope which we have set to $0.23$, we consider this pixel to be along an edge.</p>
 							<p>For pixels along an edge, we draw a white pixel and set the opacity value to be very high.</p>
-							<p>Otherwise, we color in the pixel value with a pencil texture, based on the average color channel's intensity value, 0.33 * (r + g + b).</p>
-							<p>TODO: WRITE ABOUT THE PENCIL TEXTURE</p>
+							<p>Otherwise, we color in the pixel value with a pencil texture, based on the average color channel's intensity value, $0.33 ^* (r+g+b)$.</p>
+
+
+							<p>
+								The pencil shaders work to re-create an effect similar to that which one may see in a shaded yet mostly black-and-white Manga comic book. 
+								The pencil shaders work by first determining whether a pixel is along an edge. 
+								We do this by implementing the sobel filter, and if the value output by the sobel filter is greater than a threshold, we can say that the pixel is along an edge.
+								Then we draw a white pixel and set the opacity value to be very high.
+								Otherwise, we color in the pixel value with a pencil texture, based on the average color channel's intensity value, $0.33 ^* (r+g+b)$.
+								Finally, we add a noise texture to the image to make it look more like a pencil drawing.
+							</p>
 
 							<p>Here is a comparison between the base shaders with the noir pencil shader.</p>
 							<span class="image fit"><img src="images/Normal.png"></span>
 							<span class="image fit"><img src="images/Pencil.png"></span>
 
 							<h3 id="cel">Creating the Cel Shaders</h3>
-							<p>TODO: write description about how the cel shaders were created</p>
+							<p>
+							To create the cel shaders, we first need to determine the gradient of the image. 
+							We do this by implementing the sobel filter, and if the value output by the sobel filter is greater than a threshold, we can say that the pixel is along an edge. 
+							
+							This leads to an overall effect of having a dark black border around every object in the image.
+							</p>
+
 
 							<p>Here is a comparison between the base shaders with the cel shader.</p>
 							<span class="image fit"><img src="images/Normal.png"></span>
